@@ -50,7 +50,7 @@ struct Node {
 };
 typedef struct Node node_t;
 
-node_t rootdir = {
+node_t root = {
     .name = NULL,
     .name_size = 0,
     .data = NULL,
@@ -80,6 +80,11 @@ static int __get_node_type(node_t *node)
 node_t *create_child(node_t *parent, int type, const char *name)
 {
     /* TASK-1: Check if parent is a valid directory node */
+    if (parent == NULL)
+    {
+        edufs_errno = ERR_NULLPTR_RECEIVED;
+        return NULL;
+    }
     if (__get_node_type(parent) != DIR_NODE)
     {
         edufs_errno = ERR_PARENT_NOT_DIRNODE;
@@ -218,19 +223,68 @@ node_t *create_child(node_t *parent, int type, const char *name)
 
     return child;
 }
-    
+
+
+int memfree_node(node_t *node)
+{
+
+    /* TASK-1: Ignore NULL nodes, these are already deleted */
+    if (node == NULL)
+        return 0;
+    /* END: TASK-1 */
+
+    /* TASK-2: Recursively delete the node's children (node is a dir by now) */
+    for (int i = 0; i < node->child_count; ++i)
+        memfree_node(node->children[i]);
+    /* END: TASK-2 */
+
+    /* TASK-3: Free other node contents memory */
+    free(node->name);
+    free(node->data);
+    free(node->children);
+    /* END: TASK-3 */
+
+    /* TASK-4: Free the node only if it is not the root node. Without the root,
+     * the filesystem becomes meaningless. Also, attempting to free it will
+     * cause error since the root node is non-malloc-ed memory.
+     */
+    if (node != &root)
+        free(node);
+    /* END: TASK-4 */
+
+    return 0;
+}
+
+
+int delete_node(node_t *node)
+{
+    /* TODO: Binary search (node->parent)->children[] for
+     * ((node->parent)->children[i])->name == node->name, set the
+     * corresponding node_t pointer to NULL, shift the node_t pointers of
+     * (node->parent)->children[] such that NULL moves to the end, and
+     * decrease (node->parent)->child_count by 1.
+     */
+    return memfree_node(node);
+}
+
 
 int main(void)
 {
-    node_t *new_node = create_child(&rootdir, DIR_NODE, "bin");
-    int node_type = __get_node_type(new_node);
+    node_t *bindir = create_child(&root, DIR_NODE, "bin");
+    create_child(bindir, DIR_NODE, "hack");
+    create_child(bindir, FILE_NODE, "cc");
+    create_child(bindir, FILE_NODE, "bash");
 
-    if (node_type == DIR_NODE)
-        printf("Created directory node.\n");
-    else if (node_type == FILE_NODE)
-        printf("Created file node.\n");
-    else
-        printf("Node not created.\n");
+    printf("Created directory /bin.\n");
+
+    printf("Contents of /bin:\n");
+    for (int i = 0; i < bindir->child_count; ++i)
+    {
+        printf("%s\tType: %s\n", (bindir->children[i])->name,
+        (__get_node_type(bindir->children[i]) == FILE_NODE)? "File" : "Dir");
+    }
+    if (delete_node(bindir) == 0)
+        printf("Directory /bin cleared successfully.\n");
 
     return 0;
 }
