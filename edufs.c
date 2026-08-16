@@ -1,290 +1,100 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
+#include "edufs.h"
 
-enum ErrorList {
-    ERR_MALLOC_FAIL = -2,
-    ERR_PARENT_NOT_DIRNODE = -3,
-    ERR_INVALID_NODE_NAME = -4,
-    ERR_INVALID_NODE_TYPE = -5,
-    ERR_NULLPTR_RECEIVED = -6,
-    ERR_NODE_EXISTS = -7
-};
-
-enum NodeTypes {
-    FILE_NODE,
-    DIR_NODE
-};
-
-struct Node {
-    /* Malloc-ed char array for Node name */
-    char *name;
-    size_t name_size;
-
-    /* If Node is a file, then it will contain data. The data is a malloc-ed
-     * array of bytes. If it is a directory, data will be NULL and data_size
-     * will be -1.
-     */
-    uint8_t *data;
-    ssize_t data_size;
-
-    /* If Node is a directory, then it will contain list of files and folders,
-     * all of which are the possible next nodes or the children of the given
-     * Node here. children is a malloc-ed array of next node pointers. If it
-     * is a file, children will be NULL and child_count will be -1.
-     */
-    struct Node **children;
-    ssize_t child_count;
-
-    /* Previous node for upward traversal. A Node can have many children but
-     * only ONE parent.
-     */
-    struct Node *parent;
-    
-    /* Note: A node is a:
-     * File when data_size >= 0 and child_count < 0,
-     * Directory when data_size < 0 and child_count >= 0, and
-     * Invalid otherwise.
-     */
-};
-typedef struct Node node_t;
-
-node_t root = {
-    .name = NULL,
-    .name_size = 0,
-    .data = NULL,
-    .data_size = -1,
-    .children = NULL,
-    .child_count = 0,
-    .parent = NULL
-};
 int edufs_errno = 0;
-
-
-static int __get_node_type(node_t *node)
-{   
-    if (node == NULL)
-        return -1;
-
-    if (node->data_size >= 0 && node->child_count < 0)
-        return FILE_NODE;
-
-    if (node->data_size < 0 && node->child_count >= 0)
-        return DIR_NODE;
-
-    return -1;
-}
-
-
-node_t *create_child(node_t *parent, int type, const char *name)
-{
-    /* TASK-1: Check if parent is a valid directory node */
-    if (parent == NULL)
-    {
-        edufs_errno = ERR_NULLPTR_RECEIVED;
-        return NULL;
-    }
-    if (__get_node_type(parent) != DIR_NODE)
-    {
-        edufs_errno = ERR_PARENT_NOT_DIRNODE;
-        return NULL;
-    }
-    /* END: TASK-1 */
-
-    /* TASK-2: Check if child node type is valid */
-    if (type != FILE_NODE && type != DIR_NODE)
-    {
-        edufs_errno = ERR_INVALID_NODE_TYPE;
-        return NULL;
-    }
-    /* END: TASK-2 */
-
-    /* TASK-3: Validate child name received for naming */
-    if (name == NULL)
-    {
-        edufs_errno = ERR_NULLPTR_RECEIVED;
-        return NULL;
-    }
-    if (strcmp(name, "..") == 0 || strcmp(name, ".") == 0 ||
-    strcmp(name, "") == 0)
-    {
-        edufs_errno = ERR_INVALID_NODE_NAME;
-        return NULL;
-    }
-    size_t name_size = strlen(name);
-    int i, forbidden_char_found = 0, same_name_found = 0;
-    for (i = 0; i < name_size; ++i)
-    {
-        if (!(('A' <= name[i]  && 'Z' >= name[i]) ||
-        ('a' <= name[i]  && 'z' >= name[i]) ||
-        ('0' <= name[i]  && '9' >= name[i]) ||
-        (name[i] == '#') || (name[i] == '$') || (name[i] == '%') ||
-        (name[i] == '&') || (name[i] == '(') || (name[i] == ')') ||
-        (name[i] == '*') || (name[i] == '+') || (name[i] == ',') ||
-        (name[i] == '-') || (name[i] == '.') || (name[i] == ';') ||
-        (name[i] == '=') || (name[i] == '@') || (name[i] == '[') ||
-        (name[i] == ']') || (name[i] == '^') || (name[i] == '_') ||
-        (name[i] == '{') || (name[i] == '}') ))
-        {
-            forbidden_char_found = 1;
-            break;
-        }
-    }
-    if (forbidden_char_found)
-    {
-        edufs_errno = ERR_INVALID_NODE_NAME;
-        return NULL;
-    }
-    for (i = 0; i < parent->child_count; ++i)
-    {
-        if (strcmp((parent->children[i])->name, name) == 0)
-        {
-            same_name_found = 1;
-            break;
-        }
-    }
-    if (same_name_found)
-    {
-        edufs_errno = ERR_NODE_EXISTS;
-        return NULL;
-    }
-    /* END: TASK-3 */
-
-    /* TASK-4: Create the child */
-    node_t *child = calloc(1, sizeof(node_t));
-    if (child == NULL)
-    {
-        edufs_errno = ERR_MALLOC_FAIL;
-        return NULL;
-    }
-    /* END: TASK-4 */
-    
-    /* TASK-5: Assign the child its name */
-    char *child_name = malloc((name_size + 1) * sizeof(char));
-    if (child_name == NULL)
-    {
-        edufs_errno = ERR_MALLOC_FAIL;
-        free(child);
-        return NULL;
-    }
-    strncpy(child_name, name, name_size);
-    child_name[name_size] = '\0';
-    child->name = child_name;
-    child->name_size = name_size;
-    /* END: TASK-5 */
-
-    /* TASK-6: Update child depending on the given node type */
-    if (type == DIR_NODE)
-        child->data_size = -1;
-    else if (type == FILE_NODE)
-        child->child_count = -1;
-    /* END: TASK-6 */
-
-    /* TASK-7: Update child with parent info */
-    child->parent = parent;
-    /* END: TASK-7 */
-
-    /* TASK-8: Make room for the new child */
-    node_t **old_children = parent->children;
-    parent->children = realloc(parent->children,
-    (parent->child_count + 1) * sizeof(node_t*));
-    if (parent->children == NULL)
-    {
-        parent->children = old_children;
-        edufs_errno = ERR_MALLOC_FAIL;
-        free(child->name);
-        free(child);
-        return NULL;
-    }
-    parent->children[parent->child_count] = NULL; // set new last elem to NULL
-    parent->child_count += 1;
-    /* END: TASK-8 */
-
-    /* TASK-9: Put the new child in lexographical order of the parent's
-     * children names.
-     */
-    int insert_index = parent->child_count - 1;
-    for (i = 0; i < parent->child_count; ++i)
-    {
-        if ((parent->children[i] != NULL) &&
-        strcmp((parent->children[i])->name, child->name) > 0)
-        {
-            insert_index = i;
-            break;
-        }
-    }
-    for (i = parent->child_count - 1; i > insert_index; --i)
-    {
-        parent->children[i] = parent->children[i - 1];
-    }
-    parent->children[insert_index] = child;
-    /* END: TASK-9 */
-
-    return child;
-}
-
-
-int memfree_node(node_t *node)
-{
-
-    /* TASK-1: Ignore NULL nodes, these are already deleted */
-    if (node == NULL)
-        return 0;
-    /* END: TASK-1 */
-
-    /* TASK-2: Recursively delete the node's children (node is a dir by now) */
-    for (int i = 0; i < node->child_count; ++i)
-        memfree_node(node->children[i]);
-    /* END: TASK-2 */
-
-    /* TASK-3: Free other node contents memory */
-    free(node->name);
-    free(node->data);
-    free(node->children);
-    /* END: TASK-3 */
-
-    /* TASK-4: Free the node only if it is not the root node. Without the root,
-     * the filesystem becomes meaningless. Also, attempting to free it will
-     * cause error since the root node is non-malloc-ed memory.
-     */
-    if (node != &root)
-        free(node);
-    /* END: TASK-4 */
-
-    return 0;
-}
-
-
-int delete_node(node_t *node)
-{
-    /* TODO: Binary search (node->parent)->children[] for
-     * ((node->parent)->children[i])->name == node->name, set the
-     * corresponding node_t pointer to NULL, shift the node_t pointers of
-     * (node->parent)->children[] such that NULL moves to the end, and
-     * decrease (node->parent)->child_count by 1.
-     */
-    return memfree_node(node);
-}
-
 
 int main(void)
 {
-    node_t *bindir = create_child(&root, DIR_NODE, "bin");
-    create_child(bindir, DIR_NODE, "hack");
-    create_child(bindir, FILE_NODE, "cc");
-    create_child(bindir, FILE_NODE, "bash");
-
+    node_t *bindir = edufs_mkchild(&edufs_sysroot, DIR_NODE, "bin");
     printf("Created directory /bin.\n");
 
-    printf("Contents of /bin:\n");
-    for (int i = 0; i < bindir->child_count; ++i)
+    edufs_mkchild(&edufs_sysroot, FILE_NODE, "swap");
+    printf("Created file /swap.\n");
+
+    edufs_mkchild(&edufs_sysroot, DIR_NODE, "etc");
+    printf("Created directory /etc.\n");
+
+    edufs_mkchild(&edufs_sysroot, DIR_NODE, "var");
+    printf("Created directory /var.\n");
+
+    putchar('\n');
+
+    edufs_mkchild(bindir, DIR_NODE, "hack");
+    printf("Created directory /bin/hack.\n");
+
+    edufs_mkchild(bindir, FILE_NODE, "cc");
+    printf("Created file /bin/cc.\n");
+
+    edufs_mkchild(bindir, FILE_NODE, "bash");
+    printf("Created directory /bin/bash.\n");
+
+    putchar('\n');
+
+
+    printf("Contents of /:\n");
+    for (int i = 0; i < edufs_sysroot.child_count; ++i)
     {
-        printf("%s\tType: %s\n", (bindir->children[i])->name,
-        (__get_node_type(bindir->children[i]) == FILE_NODE)? "File" : "Dir");
+        printf("%s\tType: %s\n", (edufs_sysroot.children[i])->name,
+        (edufs_node_type(edufs_sysroot.children[i]) == FILE_NODE)? "File" : "Dir");
     }
-    if (delete_node(bindir) == 0)
-        printf("Directory /bin cleared successfully.\n");
+
+    putchar('\n');
+
+    for (int j = 0; j < edufs_sysroot.child_count; ++j)
+    {
+        node_t *node = edufs_sysroot.children[j];
+
+        if (edufs_node_type(node) == DIR_NODE)
+        {
+            printf("Contents of /%s (directory):\n", node->name);
+            for (int i = 0; i < node->child_count; ++i)
+            {
+                printf("%s\tType: %s\n", (node->children[i])->name,
+                (edufs_node_type(node->children[i]) == FILE_NODE)? "File" : "Dir");
+            }
+        }
+        else
+        {
+            printf ("/%s is a file.\n", node->name);
+        }
+        putchar('\n');
+    }
+
+    if (edufs_rmtree(bindir) == 0)
+    {
+        printf("Directory /bin deleted successfully.\n");
+    }
+    else
+    {
+        printf("edufs_rmtree() failed with error code: %d\n", edufs_errno);
+        goto err;
+    }
+
+    putchar('\n');
+
+    printf("Contents of /:\n");
+    for (int i = 0; i < edufs_sysroot.child_count; ++i)
+    {
+        printf("%s\tType: %s\n", (edufs_sysroot.children[i])->name,
+        (edufs_node_type(edufs_sysroot.children[i]) == FILE_NODE)? "File" : "Dir");
+    }
+
+    putchar('\n');
+
+    if (edufs_rmtree(&edufs_sysroot) == 0)
+    {
+        printf("System root has been wiped.\n");
+    }
+    else
+    {
+        printf("edufs_rmtree() failed with error code: %d\n", edufs_errno);
+        goto err;
+    }
+
+    putchar('\n');
 
     return 0;
+
+err:
+    return -1;
 }
