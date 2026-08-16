@@ -18,14 +18,15 @@ static int __delete_node(node_t *node)
         __delete_node(node->children[i]);
     /* END: TASK-2 */
 
-    /* TASK-3: Free other node data and children memory */
+    /* TASK-3: Free node data and children memory */
     free(node->data);
     free(node->children);
     /* END: TASK-3 */
 
     /* TASK-4: Reset the node if it is the sysroot, else
      * free the node memory (sysroot node can't be deleted
-     * since it is not malloc-ed memory).
+     * since it is not malloc-ed memory) and the node name
+     * memory.
      */
     if (node == &edufs_sysroot)
     {
@@ -34,6 +35,7 @@ static int __delete_node(node_t *node)
     }
     else
     {
+        free(node->name);
         free(node);
     }
     /* END: TASK-4 */
