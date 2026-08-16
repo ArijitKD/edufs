@@ -5,6 +5,20 @@ int edufs_errno = 0;
 
 int main(void)
 {
+    printf("edufs initialized.\n\n");
+
+    printf("Contents of /:\n");
+    for (int i = 0; i < edufs_sysroot.child_count; ++i)
+    {
+        printf("%s\tType: %s\n", (edufs_sysroot.children[i])->name,
+        (edufs_node_type(edufs_sysroot.children[i]) == FILE_NODE)? "File" : "Dir");
+    }
+    if (edufs_sysroot.child_count == 0)
+    {
+        printf("[Empty directory]\n");
+    }
+    putchar('\n');
+
     node_t *bindir = edufs_mkchild(&edufs_sysroot, DIR_NODE, "bin");
     printf("Created directory /bin.\n");
 
@@ -30,7 +44,6 @@ int main(void)
 
     putchar('\n');
 
-
     printf("Contents of /:\n");
     for (int i = 0; i < edufs_sysroot.child_count; ++i)
     {
@@ -47,10 +60,17 @@ int main(void)
         if (edufs_node_type(node) == DIR_NODE)
         {
             printf("Contents of /%s (directory):\n", node->name);
-            for (int i = 0; i < node->child_count; ++i)
+            if (node->child_count == 0)
             {
-                printf("%s\tType: %s\n", (node->children[i])->name,
-                (edufs_node_type(node->children[i]) == FILE_NODE)? "File" : "Dir");
+                printf("[Empty directory]\n");
+            }
+            else
+            {
+                for (int i = 0; i < node->child_count; ++i)
+                {
+                    printf("%s\tType: %s\n", (node->children[i])->name,
+                    (edufs_node_type(node->children[i]) == FILE_NODE)? "File" : "Dir");
+                }
             }
         }
         else
@@ -69,7 +89,6 @@ int main(void)
         printf("edufs_rmtree() failed with error code: %d\n", edufs_errno);
         goto err;
     }
-
     putchar('\n');
 
     printf("Contents of /:\n");
@@ -78,7 +97,6 @@ int main(void)
         printf("%s\tType: %s\n", (edufs_sysroot.children[i])->name,
         (edufs_node_type(edufs_sysroot.children[i]) == FILE_NODE)? "File" : "Dir");
     }
-
     putchar('\n');
 
     if (edufs_rmtree(&edufs_sysroot) == 0)
@@ -90,7 +108,18 @@ int main(void)
         printf("edufs_rmtree() failed with error code: %d\n", edufs_errno);
         goto err;
     }
+    putchar('\n');
 
+    printf("Contents of /:\n");
+    for (int i = 0; i < edufs_sysroot.child_count; ++i)
+    {
+        printf("%s\tType: %s\n", (edufs_sysroot.children[i])->name,
+        (edufs_node_type(edufs_sysroot.children[i]) == FILE_NODE)? "File" : "Dir");
+    }
+    if (edufs_sysroot.child_count == 0)
+    {
+        printf("[Empty directory]\n");
+    }
     putchar('\n');
 
     return 0;
