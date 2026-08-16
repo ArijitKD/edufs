@@ -7,6 +7,7 @@
 #define ERR_INVALID_NODE_TYPE   -5
 #define ERR_NULLPTR_RECEIVED    -6
 #define ERR_NODE_EXISTS         -7
+#define ERR_NODE_HAS_CHILDREN   -8
 
 extern int edufs_errno;
 

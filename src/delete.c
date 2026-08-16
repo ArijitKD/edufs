@@ -104,5 +104,12 @@ end:
 
 int edufs_remove(node_t *node)
 {
-    return -1;
+    /* Delete file nodes or empty dir nodes only */
+
+    if (node->child_count > 0)
+    {
+        edufs_errno = ERR_NODE_HAS_CHILDREN;
+        return -1;
+    }
+    return __delete_node(node);
 }
