@@ -40,7 +40,7 @@ int main(void)
     printf("Created file /bin/cc.\n");
 
     edufs_mkchild(bindir, FILE_NODE, "bash");
-    printf("Created directory /bin/bash.\n");
+    printf("Created file /bin/bash.\n");
 
     putchar('\n');
 
